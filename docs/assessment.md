@@ -14,8 +14,8 @@ Your Task: Build a reflow algorithm that reschedules work orders while respectin
 ## Core Requirements
 
 ### Algorithm (TypeScript)
-- Input: Work orders, work centers (machines), manufacturing orders
-- Output: Valid schedule with updated dates, list of changes, explanation
+- Input: `{ workOrders: WorkOrder[], workCenters: WorkCenter[], manufacturingOrders: ManufacturingOrder[] }`
+- Output: `{ updatedWorkOrders: WorkOrder[], changes: Change[], explanation: string }`
 - Rules:
   - Work orders take full `durationMinutes` to complete
   - Work pauses outside shift hours, resumes in next shift
@@ -23,6 +23,7 @@ Your Task: Build a reflow algorithm that reschedules work orders while respectin
   - All dependencies must complete before dependent work starts
 - Error handling: Throw error explaining which constraints cannot be satisfied if no valid solution exists
 - Dates: All dates in ISO string format (UTC)
+- Service: Create `ReflowService` class with `reflow()` method
 
 ### Hard Constraints
 - Work Center: One order at a time per machine, respect shifts, no work during maintenance
@@ -31,8 +32,9 @@ Your Task: Build a reflow algorithm that reschedules work orders while respectin
 
 ### Deliverables
 - ✅ Working algorithm (TypeScript class/service)
-- ✅ CLI script (`bin/simulate.ts`) that loads JSON and runs algorithm
-- ✅ Sample data (3+ scenarios in JSON files)
+- ✅ CLI script (`bin/simulate.ts`) that loads scenarios from `src/data/scenarios.ts` and runs algorithm
+- ✅ Sample data (3+ scenarios in `src/data/scenarios.ts` - TypeScript file, strongly typed)
+- ✅ Script (`bin/add-scenarios.ts`) to generate random scenarios: `npm run add-scenarios <workOrderCount>`
 - ✅ Automated test suite (Vitest)
 - ✅ Loom demo (5-10 min)
 - ✅ GitHub repo with README
@@ -63,22 +65,24 @@ Algorithm must handle:
 - Vitest (testing framework)
 - Luxon (date manipulation - required for shift calculations)
 - Lodash (utility helpers)
-- ts-node (for running bin scripts)
+- tsx (for running bin scripts - faster than ts-node)
+- @faker-js/faker (for generating random scenarios)
 
 ### Project Structure
 ```
 src/
+├── data/
+│   ├── types.ts                   # TypeScript types (WorkOrder, WorkCenter, ManufacturingOrder, Scenario)
+│   └── scenarios.ts                # Sample scenarios array (TypeScript, strongly typed)
 ├── reflow/
 │   ├── reflow.service.ts          # Main algorithm class
 │   ├── constraint-checker.ts      # Validation logic
-│   └── types.ts                   # TypeScript types
+│   └── date-utils.ts              # Date helpers (Luxon)
 ├── util/
-│   ├── date-utils.ts              # Date helpers (Luxon)
-│   └── tests.ts                   # Test utilities
+│   └── tests.ts                   # Test utilities (toModule, FnTestCase)
 bin/
-└── simulate.ts                    # CLI script that loads JSON and runs
-data/
-└── scenarios/                    # JSON files with sample data
+├── simulate.ts                    # CLI script that loads scenarios and runs algorithm
+└── add-scenarios.ts               # Script to generate random scenarios
 ```
 
 ### TypeScript Style
@@ -123,20 +127,37 @@ data/
 ### Data Structures
 All documents follow: `{ docId: string, docType: string, data: {...} }`
 - WorkOrder: `workOrderNumber`, `manufacturingOrderId`, `workCenterId`, `startDate`, `endDate`, `durationMinutes`, `isMaintenance`, `dependsOnWorkOrderIds[]`
-- WorkCenter: `name`, `shifts[]` (dayOfWeek 0-6, startHour/endHour 0-23), `maintenanceWindows[]` (startDate/endDate)
+- WorkCenter: `name`, `shifts[]` (dayOfWeek 0-6 Sunday=0, startHour/endHour 0-23), `maintenanceWindows[]` (startDate/endDate, reason?)
 - ManufacturingOrder: `manufacturingOrderNumber`, `itemId`, `quantity`, `dueDate`
+- Scenario: `{ workOrders: WorkOrder[], workCenters: WorkCenter[], manufacturingOrders: ManufacturingOrder[] }`
+
+Types are defined in `src/data/types.ts`. Import: `import type { WorkOrder, WorkCenter, ManufacturingOrder, Scenario } from 'src/data/types'`
 
 ### Sample Data Generation
-- Required scenarios: Hand-craft 3+ JSON files in `data/scenarios/` to test specific edge cases (delay cascade, shift boundaries, maintenance conflicts)
-- Optional: Use `@faker-js/faker` for generating additional random scenarios if needed
-- Each scenario should be a complete, valid input that demonstrates a specific constraint or combination
+- Scenarios stored in `src/data/scenarios.ts` as TypeScript array: `export const scenarios: Scenario[] = [...]`
+- Each scenario is a complete test case with all three arrays
+- Use `npm run add-scenarios <workOrderCount>` to generate random scenarios
+- Required: Hand-craft 3+ scenarios to test specific edge cases:
+  1. Delay Cascade: One order delayed → affects downstream orders
+  2. Shift/Maintenance: Order spans shifts OR conflicts with maintenance
+  3. Complex: Multiple constraints combined
+- Script auto-formats with eslint --fix (runs twice)
+
+### Key Implementation Details
+- Reflow service interface: `reflow({ workOrders, workCenters, manufacturingOrders })` returns `{ updatedWorkOrders, changes, explanation }`
+- simulate.ts: Loads scenarios from `src/data/scenarios.ts`, runs each through reflow service, displays results
+- Shift calculation: Use Luxon to handle pause/resume across shift boundaries (work pauses outside shifts, resumes next shift)
+- Constraint order: Dependencies → Work Center Conflicts → Shifts → Maintenance
+- All dates must be UTC ISO strings (end with 'Z')
 
 ### Reference Files
 - Original requirements: `BE-technical-test.md`
+- Types: `src/data/types.ts`
+- Sample scenarios: `src/data/scenarios.ts`
 - Coding style: `~/Code/vetbrain/vetbrain-api/src/util/util.ts`
 - Test patterns: `~/Code/vetbrain/vetbrain-api/src/util/util.test.ts`
 - Test utilities: `~/Code/vetbrain/vetbrain-api/src/util/tests.ts`
-- CLI script: `~/Code/vetbrain/vetbrain-api/bin/generate-id.ts`
+- CLI script example: `~/Code/vetbrain/vetbrain-api/bin/generate-id.ts`
 - TypeScript config: `~/Code/vetbrain/vetbrain-api/tsconfig.json`
 - Vitest config: `~/Code/vetbrain/vetbrain-api/vitest.config.ts`
 - ESLint config: `~/Code/vetbrain/vetbrain-api/eslint.config.js`

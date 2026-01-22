@@ -11,7 +11,6 @@ export default defineConfig(() => ({
     environment: 'node',
     include: ['src/**/*.test.ts', 'bin/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'tmp'],
-    setupFiles: ['./src/setup.ts'],
     reporters: [VERBOSE ? 'verbose' : 'dot'],
     logHeapUsage: false,
     outputFile: undefined,
