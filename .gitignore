@@ -1,0 +1,10 @@
+dist
+*.tsbuildinfo
+node_modules
+*.log
+.env
+tmp
+.DS_Store
+.eslintcache
+bin/test/
+tests.log
