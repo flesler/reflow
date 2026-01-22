@@ -1,6 +1,9 @@
 /* dev dependencies */
 import { execSync } from 'child_process'
 
+// Format: $ npm run ts -- bin/install-npm.ts [--dev] <package1> [package2] ...
+// Example: $ npm run ts -- bin/install-npm.ts --dev vitest
+
 function main() {
   const args = process.argv.slice(2)
   const isDev = args[0] === '--dev'

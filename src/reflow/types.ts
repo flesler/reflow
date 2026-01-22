@@ -1,5 +1,7 @@
 export type Document = WorkOrder | WorkCenter | ManufacturingOrder
 
+export type Shift = WorkCenter['data']['shifts'][number]
+
 export type WorkOrder = {
   docId: string
   docType: 'workOrder'
@@ -48,4 +50,20 @@ export type Scenario = {
   workOrders: WorkOrder[]
   workCenters: WorkCenter[]
   manufacturingOrders: ManufacturingOrder[]
+}
+
+export type Change = {
+  workOrderId: string
+  workOrderNumber: string
+  oldStartDate: string
+  newStartDate: string
+  oldEndDate: string
+  newEndDate: string
+  reason: string
+}
+
+export type ReflowResult = {
+  updatedWorkOrders: WorkOrder[]
+  changes: Change[]
+  explanation: string
 }

@@ -4,10 +4,14 @@ import fs from 'fs'
 import { DateTime } from 'luxon'
 import path from 'path'
 import { scenarios as existingScenarios } from 'src/data/scenarios'
-import type { ManufacturingOrder, Scenario, WorkCenter, WorkOrder } from 'src/data/types'
+import type { ManufacturingOrder, Scenario, WorkCenter, WorkOrder } from 'src/reflow/types'
+import * as dateUtils from 'src/utils/date-utils'
+
+// Format: $ npm run ts -- bin/add-scenarios.ts <amount> [scenarios] [--wipe]
+// Example: $ npm run ts -- bin/add-scenarios.ts 10 3 --wipe
 
 function generateWorkCenter(id: string, name: string): WorkCenter {
-  const shifts = [
+  const shifts: WorkCenter['data']['shifts'] = [
     { dayOfWeek: 1, startHour: 8, endHour: 17 },
     { dayOfWeek: 2, startHour: 8, endHour: 17 },
     { dayOfWeek: 3, startHour: 8, endHour: 17 },
@@ -57,11 +61,16 @@ function generateWorkOrder(
   workCenterId: string,
   manufacturingOrderId: string,
   existingWorkOrderIds: string[],
+  workCenter: WorkCenter,
 ): WorkOrder {
   const isMaintenance = faker.datatype.boolean({ probability: 0.1 })
   const durationMinutes = faker.number.int({ min: 30, max: 480 })
-  const startDate = DateTime.utc().plus({ days: faker.number.int({ min: 0, max: 14 }) }).startOf('hour').toUTC().toISO()!
-  const endDate = DateTime.fromISO(startDate, { zone: 'utc' }).plus({ minutes: durationMinutes }).toUTC().toISO()!
+  let startDate = DateTime.utc().plus({ days: faker.number.int({ min: 0, max: 14 }) }).startOf('hour')
+  if (!dateUtils.isWithinAnyShift(startDate, workCenter.data.shifts)) {
+    startDate = dateUtils.getNextShiftStart(startDate, workCenter.data.shifts)
+  }
+  const startDateStr = startDate.toUTC().toISO()!
+  const endDate = dateUtils.calculateEndDateWithShifts(startDateStr, durationMinutes, workCenter.data.shifts)
 
   const dependsOnWorkOrderIds: string[] = []
   if (existingWorkOrderIds.length > 0 && faker.datatype.boolean({ probability: 0.4 })) {
@@ -77,7 +86,7 @@ function generateWorkOrder(
       workOrderNumber: `WO-${faker.string.alphanumeric(8).toUpperCase()}`,
       manufacturingOrderId,
       workCenterId,
-      startDate,
+      startDate: startDateStr,
       endDate,
       durationMinutes,
       isMaintenance,
@@ -114,8 +123,9 @@ function generateScenario(amount: number): Scenario {
     const id = `wo-${faker.string.alphanumeric(8)}`
     workOrderIds.push(id)
     const workCenterId = faker.helpers.arrayElement(workCenterIds)
+    const workCenter = workCenters.find(wc => wc.docId === workCenterId)!
     const manufacturingOrderId = faker.helpers.arrayElement(manufacturingOrderIds)
-    workOrders.push(generateWorkOrder(id, workCenterId, manufacturingOrderId, workOrderIds.slice(0, -1)))
+    workOrders.push(generateWorkOrder(id, workCenterId, manufacturingOrderId, workOrderIds.slice(0, -1), workCenter))
   }
 
   return {
@@ -126,29 +136,46 @@ function generateScenario(amount: number): Scenario {
 }
 
 function main() {
-  const amount = process.argv[2] ? Number.parseInt(process.argv[2], 10) : 10
+  const args = process.argv.slice(2)
+  const wipeIndex = args.indexOf('--wipe')
+  const shouldWipe = wipeIndex !== -1
+  if (shouldWipe) {
+    args.splice(wipeIndex, 1)
+  }
+
+  const amount = args[0] ? Number.parseInt(args[0], 10) : 10
+  const numScenarios = args[1] ? Number.parseInt(args[1], 10) : 1
+
   if (!amount || amount < 1) {
-    console.error('Usage: npm run ts -- bin/add-scenarios.ts <amount>')
-    console.error('  amount: number of work orders to generate for this scenario (default: 10)')
+    console.error('Usage: npm run ts -- bin/add-scenarios.ts <amount> [scenarios] [--wipe]')
+    console.error('  amount: number of work orders to generate per scenario (default: 10)')
+    console.error('  scenarios: number of scenarios to generate (default: 1)')
+    console.error('  --wipe: wipe existing scenarios before adding new ones')
     process.exit(1)
   }
 
-  const scenario = generateScenario(amount)
+  if (!numScenarios || numScenarios < 1) {
+    console.error('Error: number of scenarios must be at least 1')
+    process.exit(1)
+  }
 
-  console.log(`Generated scenario with:`)
-  console.log(`  - ${scenario.workOrders.length} work orders`)
-  console.log(`  - ${scenario.workCenters.length} work centers`)
-  console.log(`  - ${scenario.manufacturingOrders.length} manufacturing orders`)
+  const scenarios: Scenario[] = []
+  for (let i = 0; i < numScenarios; i++) {
+    const scenario = generateScenario(amount)
+    scenarios.push(scenario)
+    console.log(`Generated scenario ${i + 1}/${numScenarios} with:`)
+    console.log(`  - ${scenario.workOrders.length} work orders`)
+    console.log(`  - ${scenario.workCenters.length} work centers`)
+    console.log(`  - ${scenario.manufacturingOrders.length} manufacturing orders`)
+  }
 
   const filePath = path.join(__dirname, '../src/data/scenarios.ts')
 
-  // Add new scenario to existing scenarios
-  const allScenarios = [...existingScenarios, scenario]
+  const allScenarios = shouldWipe ? scenarios : [...existingScenarios, ...scenarios]
 
-  // Build file content
   const scenariosArray = allScenarios.map(s => JSON.stringify(s, null, 2)).join(',\n\n  ')
 
-  const finalContent = `import type { Scenario } from 'src/data/types'
+  const finalContent = `import type { Scenario } from 'src/reflow/types'
 
 export const scenarios: Scenario[] = [
   ${scenariosArray},
@@ -156,7 +183,7 @@ export const scenarios: Scenario[] = [
 `
 
   fs.writeFileSync(filePath, finalContent, 'utf8')
-  console.log(`\nAdded scenario to ${filePath}`)
+  console.log(`\n${shouldWipe ? 'Replaced' : 'Added'} ${numScenarios} scenario(s) to ${filePath}`)
 
   function runEslintFix() {
     try {
@@ -166,7 +193,6 @@ export const scenarios: Scenario[] = [
     }
   }
 
-  // Run eslint --fix twice
   runEslintFix()
   runEslintFix()
 }

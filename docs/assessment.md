@@ -72,18 +72,20 @@ Algorithm must handle:
 ```
 src/
 ├── data/
-│   ├── types.ts                   # TypeScript types (WorkOrder, WorkCenter, ManufacturingOrder, Scenario)
 │   └── scenarios.ts                # Sample scenarios array (TypeScript, strongly typed)
 ├── reflow/
 │   ├── reflow.service.ts          # Main algorithm class
 │   ├── constraint-checker.ts      # Validation logic
-│   └── date-utils.ts              # Date helpers (Luxon)
-├── util/
-│   └── tests.ts                   # Test utilities (toModule, FnTestCase)
+│   └── types.ts                   # TypeScript types
+└── utils/
+    ├── date-utils.ts              # Date helpers (Luxon)
+    └── tests.ts                   # Test utilities (toModule, FnTestCase)
 bin/
 ├── simulate.ts                    # CLI script that loads scenarios and runs algorithm
 └── add-scenarios.ts               # Script to generate random scenarios
 ```
+
+**Note**: Spec structure (BE-technical-test.md) takes precedence over user preferences. Date utilities follow spec location: `utils/date-utils.ts`.
 
 ### TypeScript Style
 - No semicolons
@@ -101,7 +103,7 @@ bin/
 - Type inference: Use `FnTestCase<typeof fn>` for automatic type inference
 - Pattern:
   ```typescript
-  import { toModule, type FnTestCase } from 'src/util/tests'
+  import { toModule, type FnTestCase } from 'src/utils/tests'
   import { describe, it, expect } from 'vitest'
   
   describe(toModule(__filename), () => {
@@ -131,7 +133,7 @@ All documents follow: `{ docId: string, docType: string, data: {...} }`
 - ManufacturingOrder: `manufacturingOrderNumber`, `itemId`, `quantity`, `dueDate`
 - Scenario: `{ workOrders: WorkOrder[], workCenters: WorkCenter[], manufacturingOrders: ManufacturingOrder[] }`
 
-Types are defined in `src/data/types.ts`. Import: `import type { WorkOrder, WorkCenter, ManufacturingOrder, Scenario } from 'src/data/types'`
+Types are defined in `src/reflow/types.ts` (per spec). Import: `import type { WorkOrder, WorkCenter, ManufacturingOrder, Scenario } from 'src/reflow/types'`
 
 ### Sample Data Generation
 - Scenarios stored in `src/data/scenarios.ts` as TypeScript array: `export const scenarios: Scenario[] = [...]`
