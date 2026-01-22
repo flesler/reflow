@@ -122,6 +122,69 @@ describe(toModule(__filename), () => {
           errors: expect.arrayContaining([expect.stringContaining('overlap')]),
         },
       },
+      {
+        desc: 'maintenance overlap during working time',
+        input: [
+          [{
+            ...baseWorkOrder,
+            data: {
+              ...baseWorkOrder.data,
+              startDate: '2024-01-15T08:00:00.000Z',
+              endDate: '2024-01-15T11:00:00.000Z',
+              durationMinutes: 180,
+            },
+          }],
+          [{
+            ...baseWorkCenter,
+            data: {
+              ...baseWorkCenter.data,
+              maintenanceWindows: [
+                {
+                  startDate: '2024-01-15T09:00:00.000Z',
+                  endDate: '2024-01-15T10:00:00.000Z',
+                  reason: 'Calibration',
+                },
+              ],
+            },
+          }],
+        ],
+        expected: {
+          valid: false,
+          errors: expect.arrayContaining([expect.stringContaining('maintenance window')]),
+        },
+      },
+      {
+        desc: 'maintenance overlap outside working hours',
+        input: [
+          [{
+            ...baseWorkOrder,
+            data: {
+              ...baseWorkOrder.data,
+              startDate: '2024-01-15T16:00:00.000Z',
+              endDate: '2024-01-16T09:00:00.000Z',
+              durationMinutes: 120,
+            },
+          }],
+          [{
+            ...baseWorkCenter,
+            data: {
+              ...baseWorkCenter.data,
+              shifts: [
+                { dayOfWeek: 1, startHour: 8, endHour: 17 },
+                { dayOfWeek: 2, startHour: 8, endHour: 17 },
+              ],
+              maintenanceWindows: [
+                {
+                  startDate: '2024-01-15T18:00:00.000Z',
+                  endDate: '2024-01-15T19:00:00.000Z',
+                  reason: 'Inspection',
+                },
+              ],
+            },
+          }],
+        ],
+        expected: { valid: true, errors: [] },
+      },
     ]
 
     cases.forEach(({ desc, input, expected }) => {

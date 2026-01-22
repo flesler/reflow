@@ -36,6 +36,16 @@ describe(toModule(__filename), () => {
         input: [DateTime.utc(2024, 1, 15, 17, 0), { dayOfWeek: 1, startHour: 8, endHour: 17 }],
         expected: false,
       },
+      {
+        desc: 'overnight shift after midnight',
+        input: [DateTime.utc(2024, 1, 16, 1, 0), { dayOfWeek: 1, startHour: 22, endHour: 6 }],
+        expected: true,
+      },
+      {
+        desc: 'overnight shift before midnight',
+        input: [DateTime.utc(2024, 1, 15, 23, 0), { dayOfWeek: 1, startHour: 22, endHour: 6 }],
+        expected: true,
+      },
     ]
 
     cases.forEach(({ desc, input, expected }) => {
@@ -76,6 +86,19 @@ describe(toModule(__filename), () => {
     })
   })
 
+  describe('getNextShiftStart', () => {
+    it('should pick earliest shift when multiple shifts exist on same day', () => {
+      const shifts = [
+        { dayOfWeek: 1, startHour: 13, endHour: 17 }, // Afternoon shift
+        { dayOfWeek: 1, startHour: 8, endHour: 12 }, // Morning shift (earlier)
+      ]
+      const date = DateTime.utc(2024, 1, 15, 7, 0) // Monday 7 AM, before both shifts
+      const result = dateUtils.getNextShiftStart(date, shifts)
+      expect(result.hour).toBe(8) // Should pick morning shift, not afternoon
+      expect(result.day).toBe(15)
+    })
+  })
+
   describe('calculateEndDateWithShifts', () => {
     const shifts = [
       { dayOfWeek: 1, startHour: 8, endHour: 17 },
@@ -97,6 +120,13 @@ describe(toModule(__filename), () => {
         desc: 'starts outside shift',
         input: ['2024-01-15T18:00:00.000Z', 120, shifts],
         expected: '2024-01-16T10:00:00.000Z',
+      },
+      {
+        desc: 'overnight shift spans midnight',
+        input: ['2024-01-15T23:00:00.000Z', 120, [
+          { dayOfWeek: 1, startHour: 22, endHour: 6 },
+        ]],
+        expected: '2024-01-16T01:00:00.000Z',
       },
     ]
 

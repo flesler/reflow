@@ -1,6 +1,4 @@
-## The Production Schedule Reflow Exercise
-
-Original requirements: `BE-technical-test.md`
+## The Production Schedule Reflow
 
 The Problem: Manufacturing facility with multiple extrusion lines. Work orders scheduled across lines require rescheduling when disruptions occur:
 - Work orders run longer than expected
@@ -154,13 +152,13 @@ Types are defined in `src/reflow/types.ts` (per spec). Import: `import type { Wo
 
 ### Reference Files
 - Original requirements: `BE-technical-test.md`
-- Types: `src/data/types.ts`
+- Types: `src/reflow/types.ts`
 - Sample scenarios: `src/data/scenarios.ts`
-- Coding style: `~/Code/vetbrain/vetbrain-api/src/util/util.ts`
-- Test patterns: `~/Code/vetbrain/vetbrain-api/src/util/util.test.ts`
-- Test utilities: `~/Code/vetbrain/vetbrain-api/src/util/tests.ts`
-- CLI script example: `~/Code/vetbrain/vetbrain-api/bin/generate-id.ts`
-- TypeScript config: `~/Code/vetbrain/vetbrain-api/tsconfig.json`
-- Vitest config: `~/Code/vetbrain/vetbrain-api/vitest.config.ts`
-- ESLint config: `~/Code/vetbrain/vetbrain-api/eslint.config.js`
-- Package.json: `~/Code/vetbrain/vetbrain-api/package.json`
+- Coding style: `~/Code/example/src/util/util.ts`
+- Test patterns: `~/Code/example/src/util/util.test.ts`
+- Test utilities: `~/Code/example/src/util/tests.ts`
+- CLI script example: `~/Code/example/bin/generate-id.ts`
+- TypeScript config: `~/Code/example/tsconfig.json`
+- Vitest config: `~/Code/example/vitest.config.ts`
+- ESLint config: `~/Code/example/eslint.config.js`
+- Package.json: `~/Code/example/package.json`

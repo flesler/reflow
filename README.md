@@ -100,15 +100,14 @@ npm run test:types
 ```
 src/
 ├── data/
-│   ├── types.ts              # TypeScript type definitions
 │   └── scenarios.ts          # Scenario data (work orders, work centers, manufacturing orders)
 ├── reflow/
 │   ├── reflow.service.ts     # Main reflow algorithm
-│   └── constraint-checker.ts # Constraint validation
-└── util/
-    ├── date.ts               # Date/shift utilities (Luxon)
-    ├── tests.ts              # Test utilities
-    └── index.ts              # Utility exports
+│   ├── constraint-checker.ts # Constraint validation
+│   └── types.ts              # TypeScript type definitions
+└── utils/
+    ├── date-utils.ts         # Date/shift utilities (Luxon)
+    └── tests.ts              # Test utilities
 bin/
 ├── simulate.ts               # CLI script to run simulations
 └── add-scenarios.ts          # CLI script to generate scenarios

@@ -49,7 +49,7 @@ export function validateConstraints(
     for (const mw of workCenter.data.maintenanceWindows) {
       const mwStart = DateTime.fromISO(mw.startDate, { zone: 'utc' })
       const mwEnd = DateTime.fromISO(mw.endDate, { zone: 'utc' })
-      if (startDate < mwEnd && endDate > mwStart) {
+      if (dateUtils.hasWorkingTimeOverlapWithMaintenance(startDate, endDate, mwStart, mwEnd, workCenter.data.shifts)) {
         errors.push(`Work order ${wo.data.workOrderNumber} overlaps with maintenance window: ${mw.reason || 'unspecified'}`)
       }
     }

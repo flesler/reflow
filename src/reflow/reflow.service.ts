@@ -1,8 +1,21 @@
 import { DateTime } from 'luxon'
-import type { Scenario, WorkCenter, WorkOrder } from 'src/reflow/types'
 import { validateConstraints } from 'src/reflow/constraint-checker'
-import type { Change, ReflowResult } from 'src/reflow/types'
+import type { Change, ReflowResult, Scenario, WorkCenter, WorkOrder } from 'src/reflow/types'
 import * as dateUtils from 'src/utils/date-utils'
+
+type ScheduleInterval = {
+  start: DateTime
+  end: DateTime
+  workOrderId: string
+}
+
+function overlaps(a: ScheduleInterval, b: ScheduleInterval): boolean {
+  return a.start < b.end && a.end > b.start
+}
+
+function sortByStart(intervals: ScheduleInterval[]): ScheduleInterval[] {
+  return [...intervals].sort((a, b) => a.start.toMillis() - b.start.toMillis())
+}
 
 export class ReflowService {
   reflow(input: Scenario): ReflowResult {
@@ -13,7 +26,8 @@ export class ReflowService {
 
     const sortedWorkOrders = this.topologicalSort(workOrders, workOrderMap)
     const updatedWorkOrders: WorkOrder[] = []
-    const workCenterSchedules = new Map<string, Array<{ start: DateTime; end: DateTime; workOrderId: string }>>()
+    const updatedWorkOrderMap = new Map<string, WorkOrder>()
+    const workCenterSchedules = new Map<string, ScheduleInterval[]>()
 
     for (const workCenter of workCenters) {
       workCenterSchedules.set(workCenter.docId, [])
@@ -22,46 +36,21 @@ export class ReflowService {
     // Pre-populate schedules with maintenance orders (they can't be moved)
     for (const wo of sortedWorkOrders) {
       if (wo.data.isMaintenance) {
-        const startDate = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
-        const endDate = DateTime.fromISO(wo.data.endDate, { zone: 'utc' })
-        workCenterSchedules.get(wo.data.workCenterId)!.push({
-          start: startDate,
-          end: endDate,
-          workOrderId: wo.docId,
-        })
+        const interval = this.createInterval(wo)
+        workCenterSchedules.get(wo.data.workCenterId)!.push(interval)
       }
+    }
+
+    // Sort schedules after pre-populating maintenance orders
+    for (const [workCenterId, schedule] of workCenterSchedules.entries()) {
+      workCenterSchedules.set(workCenterId, sortByStart(schedule))
     }
 
     for (const wo of sortedWorkOrders) {
       const workCenter = workCenterMap.get(wo.data.workCenterId)!
-      const shifts = workCenter.data.shifts
+      const schedule = workCenterSchedules.get(wo.data.workCenterId)!
 
-      let newStartDate: DateTime
-      let newEndDate: DateTime
-
-      if (wo.data.isMaintenance) {
-        newStartDate = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
-        newEndDate = DateTime.fromISO(wo.data.endDate, { zone: 'utc' })
-      } else {
-        let candidateStart = this.getEarliestDependencyEnd(wo, updatedWorkOrders, workOrderMap)
-
-        candidateStart = this.adjustToShiftStart(candidateStart, shifts)
-
-        candidateStart = this.findAvailableSlot(
-          candidateStart,
-          wo.data.durationMinutes,
-          workCenter,
-          workCenterSchedules.get(wo.data.workCenterId)!,
-        )
-
-        newStartDate = candidateStart
-        const endDateStr = dateUtils.calculateEndDateWithShifts(
-          newStartDate.toUTC().toISO()!,
-          wo.data.durationMinutes,
-          shifts,
-        )
-        newEndDate = DateTime.fromISO(endDateStr, { zone: 'utc' })
-      }
+      const { start: newStartDate, end: newEndDate } = this.scheduleWorkOrder(wo, workCenter, schedule, updatedWorkOrderMap, workOrderMap)
 
       const updatedWo: WorkOrder = {
         ...wo,
@@ -73,20 +62,19 @@ export class ReflowService {
       }
 
       updatedWorkOrders.push(updatedWo)
-      // Only add to schedule if not already added (maintenance orders were pre-added)
+      updatedWorkOrderMap.set(wo.docId, updatedWo)
+
       if (!wo.data.isMaintenance) {
-        workCenterSchedules.get(wo.data.workCenterId)!.push({
-          start: newStartDate,
-          end: newEndDate,
-          workOrderId: wo.docId,
-        })
+        const newInterval = { start: newStartDate, end: newEndDate, workOrderId: wo.docId }
+        schedule.push(newInterval)
+        workCenterSchedules.set(wo.data.workCenterId, sortByStart(schedule))
       }
 
       const oldStart = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
       const oldEnd = DateTime.fromISO(wo.data.endDate, { zone: 'utc' })
 
       if (oldStart.toMillis() !== newStartDate.toMillis() || oldEnd.toMillis() !== newEndDate.toMillis()) {
-        const reason = this.getChangeReason(wo, oldStart, newStartDate, updatedWorkOrders, workOrderMap)
+        const reason = this.getChangeReason(wo, oldStart, newStartDate, updatedWorkOrderMap)
         changes.push({
           workOrderId: wo.docId,
           workOrderNumber: wo.data.workOrderNumber,
@@ -111,6 +99,46 @@ export class ReflowService {
       changes,
       explanation,
     }
+  }
+
+  private createInterval(wo: WorkOrder): ScheduleInterval {
+    return {
+      start: DateTime.fromISO(wo.data.startDate, { zone: 'utc' }),
+      end: DateTime.fromISO(wo.data.endDate, { zone: 'utc' }),
+      workOrderId: wo.docId,
+    }
+  }
+
+  private scheduleWorkOrder(
+    wo: WorkOrder,
+    workCenter: WorkCenter,
+    existingSchedule: ScheduleInterval[],
+    updatedWorkOrderMap: Map<string, WorkOrder>,
+    workOrderMap: Map<string, WorkOrder>,
+  ): { start: DateTime; end: DateTime } {
+    if (wo.data.isMaintenance) {
+      const interval = this.createInterval(wo)
+      return { start: interval.start, end: interval.end }
+    }
+
+    const originalStart = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
+    let candidateStart = this.getEarliestDependencyEnd(wo, updatedWorkOrderMap, workOrderMap)
+
+    if (candidateStart < originalStart) {
+      candidateStart = originalStart
+    }
+
+    candidateStart = this.adjustToShiftStart(candidateStart, workCenter.data.shifts)
+    candidateStart = this.findAvailableSlot(candidateStart, wo.data.durationMinutes, workCenter, existingSchedule)
+
+    const endDateStr = dateUtils.calculateEndDateWithShifts(
+      candidateStart.toUTC().toISO()!,
+      wo.data.durationMinutes,
+      workCenter.data.shifts,
+    )
+    const newEndDate = DateTime.fromISO(endDateStr, { zone: 'utc' })
+
+    return { start: candidateStart, end: newEndDate }
   }
 
   private topologicalSort(workOrders: WorkOrder[], workOrderMap: Map<string, WorkOrder>): WorkOrder[] {
@@ -152,7 +180,7 @@ export class ReflowService {
 
   private getEarliestDependencyEnd(
     wo: WorkOrder,
-    updatedWorkOrders: WorkOrder[],
+    updatedWorkOrderMap: Map<string, WorkOrder>,
     workOrderMap: Map<string, WorkOrder>,
   ): DateTime {
     if (wo.data.dependsOnWorkOrderIds.length === 0) {
@@ -161,7 +189,7 @@ export class ReflowService {
 
     let latestEnd = DateTime.fromMillis(0, { zone: 'utc' })
     for (const depId of wo.data.dependsOnWorkOrderIds) {
-      const depWo = updatedWorkOrders.find(uwo => uwo.docId === depId) || workOrderMap.get(depId)
+      const depWo = updatedWorkOrderMap.get(depId) || workOrderMap.get(depId)
       if (!depWo) {
         throw new Error(`Dependency ${depId} not found for work order ${wo.data.workOrderNumber}`)
       }
@@ -184,7 +212,7 @@ export class ReflowService {
     startCandidate: DateTime,
     durationMinutes: number,
     workCenter: WorkCenter,
-    existingSchedule: Array<{ start: DateTime; end: DateTime; workOrderId: string }>,
+    existingSchedule: ScheduleInterval[],
   ): DateTime {
     let current = startCandidate
     const maxIterations = 1000
@@ -198,37 +226,37 @@ export class ReflowService {
         { zone: 'utc' },
       )
 
-      let hasConflict = false
+      const candidateInterval: ScheduleInterval = { start: current, end: endCandidate, workOrderId: '' }
 
+      // Check maintenance windows
       for (const mw of workCenter.data.maintenanceWindows) {
         const mwStart = DateTime.fromISO(mw.startDate, { zone: 'utc' })
         const mwEnd = DateTime.fromISO(mw.endDate, { zone: 'utc' })
-        if (current < mwEnd && endCandidate > mwStart) {
-          hasConflict = true
+        if (dateUtils.hasWorkingTimeOverlapWithMaintenance(current, endCandidate, mwStart, mwEnd, workCenter.data.shifts)) {
           current = mwEnd
-          break
+          current = this.adjustToShiftStart(current, workCenter.data.shifts)
+          continue
         }
       }
 
-      if (hasConflict) {
-        current = this.adjustToShiftStart(current, workCenter.data.shifts)
-        continue
-      }
-
+      // Check existing schedule (sorted, so we can optimize)
+      let hasConflict = false
       for (const scheduled of existingSchedule) {
-        if (current < scheduled.end && endCandidate > scheduled.start) {
+        if (overlaps(candidateInterval, scheduled)) {
           hasConflict = true
           current = scheduled.end
+          current = this.adjustToShiftStart(current, workCenter.data.shifts)
+          break
+        }
+        // Since schedule is sorted, if we've passed all possible overlaps, we can stop
+        if (scheduled.start > endCandidate) {
           break
         }
       }
 
-      if (hasConflict) {
-        current = this.adjustToShiftStart(current, workCenter.data.shifts)
-        continue
+      if (!hasConflict) {
+        return current
       }
-
-      return current
     }
 
     throw new Error(`Could not find available slot for work order on work center ${workCenter.data.name}`)
@@ -238,18 +266,30 @@ export class ReflowService {
     wo: WorkOrder,
     oldStart: DateTime,
     newStart: DateTime,
-    updatedWorkOrders: WorkOrder[],
-    workOrderMap: Map<string, WorkOrder>,
+    updatedWorkOrderMap: Map<string, WorkOrder>,
   ): string {
     const reasons: string[] = []
 
+    // Check if dependency constraint was binding
     if (wo.data.dependsOnWorkOrderIds.length > 0) {
-      const depEnd = this.getEarliestDependencyEnd(wo, updatedWorkOrders, workOrderMap)
-      if (newStart <= depEnd.plus({ minutes: 1 })) {
+      const originalStart = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
+      let latestDepEnd = DateTime.fromMillis(0, { zone: 'utc' })
+      for (const depId of wo.data.dependsOnWorkOrderIds) {
+        const depWo = updatedWorkOrderMap.get(depId)
+        if (depWo) {
+          const depEnd = DateTime.fromISO(depWo.data.endDate, { zone: 'utc' })
+          if (depEnd > latestDepEnd) {
+            latestDepEnd = depEnd
+          }
+        }
+      }
+      // If dependency end is after original start, dependency was likely the binding constraint
+      if (latestDepEnd > originalStart) {
         reasons.push('dependency constraint')
       }
     }
 
+    // If moved from original position, it was rescheduled
     if (oldStart.toMillis() !== newStart.toMillis()) {
       reasons.push('rescheduled')
     }
