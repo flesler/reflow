@@ -1,3 +1,5 @@
+import type { DateTime } from 'luxon'
+
 export type Document = WorkOrder | WorkCenter | ManufacturingOrder
 
 export type Shift = WorkCenter['data']['shifts'][number]
@@ -66,4 +68,13 @@ export type ReflowResult = {
   updatedWorkOrders: WorkOrder[]
   changes: Change[]
   explanation: string
+}
+
+export type Interval = {
+  start: DateTime
+  end: DateTime
+}
+
+export type ScheduleInterval = Interval & {
+  workOrderId: string
 }

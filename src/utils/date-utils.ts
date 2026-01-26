@@ -1,5 +1,17 @@
 import { DateTime } from 'luxon'
-import type { Shift } from 'src/reflow/types'
+import type { Interval, Shift } from 'src/reflow/types'
+
+export function iso(dateString: string): DateTime {
+  return DateTime.fromISO(dateString, { zone: 'utc' })
+}
+
+export function overlaps(a: Interval, b: Interval): boolean {
+  return a.start < b.end && a.end > b.start
+}
+
+export function sortByStart<T extends Interval>(intervals: T[]): T[] {
+  return [...intervals].sort((a, b) => a.start.toMillis() - b.start.toMillis())
+}
 
 export function isWithinShift(date: DateTime, shift: Shift): boolean {
   const dayOfWeek = date.weekday === 7 ? 0 : date.weekday
@@ -83,11 +95,11 @@ export function getNextShiftStart(date: DateTime, shifts: Shift[]): DateTime {
 }
 
 export function calculateEndDateWithShifts(
-  startDate: string,
+  startDate: DateTime,
   durationMinutes: number,
   shifts: Shift[],
-): string {
-  let current = DateTime.fromISO(startDate, { zone: 'utc' })
+): DateTime {
+  let current = startDate
   let remainingMinutes = durationMinutes
 
   const maxIterations = 1000
@@ -138,16 +150,12 @@ export function calculateEndDateWithShifts(
     throw new Error('Maximum iterations reached calculating end date with shifts')
   }
 
-  const iso = current.toUTC().toISO()
-  if (!iso) {
-    throw new Error('Failed to convert date to ISO string')
-  }
-  return iso
+  return current
 }
 
 export function minutesBetween(startDate: string, endDate: string, shifts: Shift[]): number {
-  let current = DateTime.fromISO(startDate, { zone: 'utc' })
-  const end = DateTime.fromISO(endDate, { zone: 'utc' })
+  let current = iso(startDate)
+  const end = iso(endDate)
   let totalMinutes = 0
 
   const maxIterations = 1000

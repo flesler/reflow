@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
-import { toModule, type FnTestCase } from 'src/utils/tests'
 import * as dateUtils from 'src/utils/date-utils'
+import { toModule, type FnTestCase } from 'src/utils/tests'
 import { describe, expect, it } from 'vitest'
 
 describe(toModule(__filename), () => {
@@ -105,43 +105,51 @@ describe(toModule(__filename), () => {
       { dayOfWeek: 2, startHour: 8, endHour: 17 },
     ]
 
-    const cases: FnTestCase<typeof dateUtils.calculateEndDateWithShifts>[] = [
+    const cases: Array<{
+      desc: string
+      startDateStr: string
+      durationMinutes: number
+      shifts: typeof shifts
+      expectedStr: string
+    }> = [
       {
         desc: 'simple case within shift',
-        input: ['2024-01-15T08:00:00.000Z', 120, shifts],
-        expected: '2024-01-15T10:00:00.000Z',
+        startDateStr: '2024-01-15T08:00:00.000Z',
+        durationMinutes: 120,
+        shifts,
+        expectedStr: '2024-01-15T10:00:00.000Z',
       },
       {
         desc: 'spans shift boundary',
-        input: ['2024-01-15T16:00:00.000Z', 120, shifts],
-        expected: '2024-01-16T09:00:00.000Z',
+        startDateStr: '2024-01-15T16:00:00.000Z',
+        durationMinutes: 120,
+        shifts,
+        expectedStr: '2024-01-16T09:00:00.000Z',
       },
       {
         desc: 'starts outside shift',
-        input: ['2024-01-15T18:00:00.000Z', 120, shifts],
-        expected: '2024-01-16T10:00:00.000Z',
+        startDateStr: '2024-01-15T18:00:00.000Z',
+        durationMinutes: 120,
+        shifts,
+        expectedStr: '2024-01-16T10:00:00.000Z',
       },
       {
         desc: 'overnight shift spans midnight',
-        input: ['2024-01-15T23:00:00.000Z', 120, [
+        startDateStr: '2024-01-15T23:00:00.000Z',
+        durationMinutes: 120,
+        shifts: [
           { dayOfWeek: 1, startHour: 22, endHour: 6 },
-        ]],
-        expected: '2024-01-16T01:00:00.000Z',
+        ],
+        expectedStr: '2024-01-16T01:00:00.000Z',
       },
     ]
 
-    cases.forEach(({ desc, input, expected }) => {
+    cases.forEach(({ desc, startDateStr, durationMinutes, shifts: testShifts, expectedStr }) => {
       it(`should handle ${desc}`, () => {
-        if (!expected) {
-          throw new Error('Expected value is required')
-        }
-        const result = dateUtils.calculateEndDateWithShifts(...input)
-        if (!result) {
-          throw new Error('calculateEndDateWithShifts returned undefined')
-        }
-        const resultDate = DateTime.fromISO(result, { zone: 'utc' })
-        const expectedDate = DateTime.fromISO(expected, { zone: 'utc' })
-        expect(resultDate.toMillis()).toBe(expectedDate.toMillis())
+        const startDate = dateUtils.iso(startDateStr)
+        const result = dateUtils.calculateEndDateWithShifts(startDate, durationMinutes, testShifts)
+        const expectedDate = dateUtils.iso(expectedStr)
+        expect(result.toMillis()).toBe(expectedDate.toMillis())
       })
     })
   })

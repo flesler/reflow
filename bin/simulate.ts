@@ -33,8 +33,8 @@ function main() {
       }
 
       console.log(`\nUpdated Work Orders: ${result.updatedWorkOrders.length}`)
-    } catch (error) {
-      console.error(`Error processing scenario ${i + 1}:`, error instanceof Error ? error.message : String(error))
+    } catch (err) {
+      console.error(`Error processing scenario ${i + 1}:`, err.message)
     }
 
     if (i < scenarios.length - 1) {

@@ -70,7 +70,8 @@ function generateWorkOrder(
     startDate = dateUtils.getNextShiftStart(startDate, workCenter.data.shifts)
   }
   const startDateStr = startDate.toUTC().toISO()!
-  const endDate = dateUtils.calculateEndDateWithShifts(startDateStr, durationMinutes, workCenter.data.shifts)
+  const endDate = dateUtils.calculateEndDateWithShifts(startDate, durationMinutes, workCenter.data.shifts)
+  const endDateStr = endDate.toUTC().toISO()!
 
   const dependsOnWorkOrderIds: string[] = []
   if (existingWorkOrderIds.length > 0 && faker.datatype.boolean({ probability: 0.4 })) {
@@ -87,7 +88,7 @@ function generateWorkOrder(
       manufacturingOrderId,
       workCenterId,
       startDate: startDateStr,
-      endDate,
+      endDate: endDateStr,
       durationMinutes,
       isMaintenance,
       dependsOnWorkOrderIds,

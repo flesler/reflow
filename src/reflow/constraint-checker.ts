@@ -1,4 +1,3 @@
-import { DateTime } from 'luxon'
 import type { WorkCenter, WorkOrder } from 'src/reflow/types'
 import * as dateUtils from 'src/utils/date-utils'
 
@@ -17,8 +16,8 @@ export function validateConstraints(
       continue
     }
 
-    const startDate = DateTime.fromISO(wo.data.startDate, { zone: 'utc' })
-    const endDate = DateTime.fromISO(wo.data.endDate, { zone: 'utc' })
+    const startDate = dateUtils.iso(wo.data.startDate)
+    const endDate = dateUtils.iso(wo.data.endDate)
 
     if (endDate <= startDate) {
       errors.push(`Work order ${wo.data.workOrderNumber} has endDate <= startDate`)
@@ -40,15 +39,15 @@ export function validateConstraints(
         errors.push(`Work order ${wo.data.workOrderNumber} depends on unknown work order ${depId}`)
         continue
       }
-      const depEndDate = DateTime.fromISO(depWo.data.endDate, { zone: 'utc' })
+      const depEndDate = dateUtils.iso(depWo.data.endDate)
       if (startDate < depEndDate) {
         errors.push(`Work order ${wo.data.workOrderNumber} starts before dependency ${depWo.data.workOrderNumber} completes`)
       }
     }
 
     for (const mw of workCenter.data.maintenanceWindows) {
-      const mwStart = DateTime.fromISO(mw.startDate, { zone: 'utc' })
-      const mwEnd = DateTime.fromISO(mw.endDate, { zone: 'utc' })
+      const mwStart = dateUtils.iso(mw.startDate)
+      const mwEnd = dateUtils.iso(mw.endDate)
       if (dateUtils.hasWorkingTimeOverlapWithMaintenance(startDate, endDate, mwStart, mwEnd, workCenter.data.shifts)) {
         errors.push(`Work order ${wo.data.workOrderNumber} overlaps with maintenance window: ${mw.reason || 'unspecified'}`)
       }
@@ -61,10 +60,10 @@ export function validateConstraints(
       for (let j = i + 1; j < wosOnCenter.length; j++) {
         const wo1 = wosOnCenter[i]
         const wo2 = wosOnCenter[j]
-        const start1 = DateTime.fromISO(wo1.data.startDate, { zone: 'utc' })
-        const end1 = DateTime.fromISO(wo1.data.endDate, { zone: 'utc' })
-        const start2 = DateTime.fromISO(wo2.data.startDate, { zone: 'utc' })
-        const end2 = DateTime.fromISO(wo2.data.endDate, { zone: 'utc' })
+        const start1 = dateUtils.iso(wo1.data.startDate)
+        const end1 = dateUtils.iso(wo1.data.endDate)
+        const start2 = dateUtils.iso(wo2.data.startDate)
+        const end2 = dateUtils.iso(wo2.data.endDate)
 
         if (start1 < end2 && end1 > start2) {
           errors.push(`Work orders ${wo1.data.workOrderNumber} and ${wo2.data.workOrderNumber} overlap on work center ${wc.data.name}`)
