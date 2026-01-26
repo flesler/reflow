@@ -4,7 +4,7 @@ import type { Change, ReflowResult, Scenario, ScheduleInterval, WorkCenter, Work
 import * as dateUtils from 'src/utils/date-utils'
 
 export class ReflowService {
-  /** Main reflow algorithm: reschedules work orders respecting dependencies, work center conflicts, shifts, and maintenance windows. */
+  /** Reschedules work orders respecting dependencies, conflicts, shifts, and maintenance. */
   reflow(input: Scenario): ReflowResult {
     const { workOrders, workCenters } = input
     const changes: Change[] = []
@@ -86,7 +86,7 @@ export class ReflowService {
     }
   }
 
-  /** Creates a schedule interval from a work order's start and end dates. */
+  /** Creates schedule interval from work order dates. */
   private createInterval(wo: WorkOrder): ScheduleInterval {
     return {
       start: dateUtils.iso(wo.data.startDate),
@@ -95,7 +95,7 @@ export class ReflowService {
     }
   }
 
-  /** Schedules a work order by finding the earliest available slot that respects dependencies, shifts, maintenance windows, and existing schedule conflicts. */
+  /** Finds earliest available slot respecting dependencies, shifts, maintenance, and conflicts. */
   private scheduleWorkOrder(
     wo: WorkOrder,
     workCenter: WorkCenter,
@@ -127,7 +127,7 @@ export class ReflowService {
     return { start: candidateStart, end: newEndDate }
   }
 
-  /** Sorts work orders topologically based on dependencies, detecting circular dependencies. */
+  /** Sorts work orders topologically by dependencies, detecting cycles. */
   private topologicalSort(workOrders: WorkOrder[], workOrderMap: Map<string, WorkOrder>): WorkOrder[] {
     const visited = new Set<string>()
     const visiting = new Set<string>()
@@ -163,7 +163,7 @@ export class ReflowService {
     return result
   }
 
-  /** Returns the latest end date among all dependencies, or the work order's start date if no dependencies exist. */
+  /** Returns latest dependency end date or work order start if no dependencies. */
   private getEarliestDependencyEnd(
     wo: WorkOrder,
     updatedWorkOrderMap: Map<string, WorkOrder>,
@@ -183,7 +183,7 @@ export class ReflowService {
     }, DateTime.fromMillis(0, { zone: 'utc' }))
   }
 
-  /** Adjusts a date to the start of the next shift if it falls outside shift hours, otherwise returns the date unchanged. */
+  /** Adjusts date to next shift start if outside shift hours. */
   private adjustToShiftStart(date: DateTime, shifts: WorkCenter['data']['shifts']): DateTime {
     if (dateUtils.isWithinAnyShift(date, shifts)) {
       return date
@@ -191,7 +191,7 @@ export class ReflowService {
     return dateUtils.getNextShiftStart(date, shifts)
   }
 
-  /** Finds the earliest available slot for a work order by checking maintenance windows and existing schedule conflicts, adjusting the start time as needed. */
+  /** Finds earliest available slot checking maintenance windows and schedule conflicts. */
   private findAvailableSlot(
     startCandidate: DateTime,
     durationMinutes: number,
@@ -243,7 +243,7 @@ export class ReflowService {
     throw new Error(`Could not find available slot for work order on work center ${workCenter.data.name}`)
   }
 
-  /** Determines the reason for a schedule change: dependency constraint, rescheduling, or schedule adjustment. */
+  /** Determines change reason: dependency, rescheduling, or adjustment. */
   private getChangeReason(
     wo: WorkOrder,
     oldStart: DateTime,
@@ -275,7 +275,7 @@ export class ReflowService {
     return reasons.length > 0 ? reasons.join(', ') : 'schedule adjustment'
   }
 
-  /** Generates a human-readable explanation of the reflow results, including counts of rescheduled and unchanged work orders. */
+  /** Generates explanation of reflow results with counts. */
   private generateExplanation(changes: Change[], totalWorkOrders: number): string {
     if (changes.length === 0) {
       return `No changes needed. All ${totalWorkOrders} work orders are already optimally scheduled.`

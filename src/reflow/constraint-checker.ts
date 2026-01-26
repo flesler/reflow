@@ -1,6 +1,7 @@
 import type { WorkCenter, WorkOrder } from 'src/reflow/types'
 import * as dateUtils from 'src/utils/date-utils'
 
+/** Validates work orders against dependencies, shifts, maintenance, and conflicts. */
 export function validateConstraints(
   workOrders: WorkOrder[],
   workCenters: WorkCenter[],

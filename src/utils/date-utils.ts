@@ -1,18 +1,22 @@
 import { DateTime } from 'luxon'
 import type { Interval, Shift } from 'src/reflow/types'
 
+/** Converts ISO string to UTC DateTime. */
 export function iso(dateString: string): DateTime {
   return DateTime.fromISO(dateString, { zone: 'utc' })
 }
 
+/** Checks if two intervals overlap. */
 export function overlaps(a: Interval, b: Interval): boolean {
   return a.start < b.end && a.end > b.start
 }
 
+/** Sorts intervals by start time. */
 export function sortByStart<T extends Interval>(intervals: T[]): T[] {
   return [...intervals].sort((a, b) => a.start.toMillis() - b.start.toMillis())
 }
 
+/** Checks if date is within shift hours. */
 export function isWithinShift(date: DateTime, shift: Shift): boolean {
   const dayOfWeek = date.weekday === 7 ? 0 : date.weekday
   const hour = date.hour
@@ -33,10 +37,12 @@ export function isWithinShift(date: DateTime, shift: Shift): boolean {
   }
 }
 
+/** Checks if date is within any shift. */
 export function isWithinAnyShift(date: DateTime, shifts: Shift[]): boolean {
   return shifts.some(shift => isWithinShift(date, shift))
 }
 
+/** Finds next shift start after date. */
 export function getNextShiftStart(date: DateTime, shifts: Shift[]): DateTime {
   const candidates: DateTime[] = []
   const maxDays = 14
@@ -94,6 +100,7 @@ export function getNextShiftStart(date: DateTime, shifts: Shift[]): DateTime {
   return candidates.reduce((earliest, candidate) => (candidate < earliest ? candidate : earliest))
 }
 
+/** Calculates end date adding duration, counting only shift hours. */
 export function calculateEndDateWithShifts(
   startDate: DateTime,
   durationMinutes: number,
@@ -153,6 +160,7 @@ export function calculateEndDateWithShifts(
   return current
 }
 
+/** Calculates working minutes between dates, counting only shift hours. */
 export function minutesBetween(startDate: string, endDate: string, shifts: Shift[]): number {
   let current = iso(startDate)
   const end = iso(endDate)
@@ -210,6 +218,7 @@ export function minutesBetween(startDate: string, endDate: string, shifts: Shift
   return totalMinutes
 }
 
+/** Checks if work period overlaps maintenance window during shift hours. */
 export function hasWorkingTimeOverlapWithMaintenance(
   workStart: DateTime,
   workEnd: DateTime,

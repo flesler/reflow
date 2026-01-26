@@ -1,7 +1,7 @@
-import { toModule } from 'src/utils/tests'
+import { ReflowService } from 'src/reflow/reflow.service'
 import type { Scenario } from 'src/reflow/types'
+import { toModule } from 'src/utils/tests'
 import { describe, expect, it } from 'vitest'
-import { ReflowService } from './reflow.service'
 
 describe(toModule(__filename), () => {
   describe('reflow', () => {
@@ -592,6 +592,95 @@ describe(toModule(__filename), () => {
 
       const service = new ReflowService()
       expect(() => service.reflow(scenario)).toThrow('Circular dependency detected')
+    })
+
+    it('should find available slot after multiple conflicts without getting stuck', () => {
+      const scenario: Scenario = {
+        workOrders: [
+          {
+            docId: 'wo-1',
+            docType: 'workOrder',
+            data: {
+              workOrderNumber: 'WO-001',
+              manufacturingOrderId: 'mo-1',
+              workCenterId: 'wc-1',
+              startDate: '2024-01-15T08:00:00.000Z',
+              endDate: '2024-01-15T10:00:00.000Z',
+              durationMinutes: 120,
+              isMaintenance: true,
+              dependsOnWorkOrderIds: [],
+            },
+          },
+          {
+            docId: 'wo-2',
+            docType: 'workOrder',
+            data: {
+              workOrderNumber: 'WO-002',
+              manufacturingOrderId: 'mo-1',
+              workCenterId: 'wc-1',
+              startDate: '2024-01-15T10:00:00.000Z',
+              endDate: '2024-01-15T12:00:00.000Z',
+              durationMinutes: 120,
+              isMaintenance: true,
+              dependsOnWorkOrderIds: [],
+            },
+          },
+          {
+            docId: 'wo-3',
+            docType: 'workOrder',
+            data: {
+              workOrderNumber: 'WO-003',
+              manufacturingOrderId: 'mo-1',
+              workCenterId: 'wc-1',
+              startDate: '2024-01-15T08:00:00.000Z',
+              endDate: '2024-01-15T14:00:00.000Z',
+              durationMinutes: 120,
+              isMaintenance: false,
+              dependsOnWorkOrderIds: [],
+            },
+          },
+        ],
+        workCenters: [
+          {
+            docId: 'wc-1',
+            docType: 'workCenter',
+            data: {
+              name: 'Line 1',
+              shifts: [
+                { dayOfWeek: 1, startHour: 8, endHour: 17 },
+              ],
+              maintenanceWindows: [
+                {
+                  startDate: '2024-01-15T12:00:00.000Z',
+                  endDate: '2024-01-15T13:00:00.000Z',
+                  reason: 'Scheduled maintenance',
+                },
+              ],
+            },
+          },
+        ],
+        manufacturingOrders: [
+          {
+            docId: 'mo-1',
+            docType: 'manufacturingOrder',
+            data: {
+              manufacturingOrderNumber: 'MO-001',
+              itemId: 'ITEM-A',
+              quantity: 100,
+              dueDate: '2024-01-20T00:00:00.000Z',
+            },
+          },
+        ],
+      }
+
+      const service = new ReflowService()
+      const result = service.reflow(scenario)
+
+      // WO-003 should be rescheduled after the two maintenance orders and the maintenance window
+      const wo3 = result.updatedWorkOrders.find(wo => wo.docId === 'wo-3')
+      expect(wo3).toBeDefined()
+      expect(wo3!.data.startDate).toBe('2024-01-15T13:00:00.000Z')
+      expect(result.changes.length).toBeGreaterThan(0)
     })
   })
 })

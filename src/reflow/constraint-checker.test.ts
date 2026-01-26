@@ -1,7 +1,7 @@
-import { toModule, type FnTestCase } from 'src/utils/tests'
+import * as constraintChecker from 'src/reflow/constraint-checker'
 import type { WorkCenter, WorkOrder } from 'src/reflow/types'
+import { toModule, type FnTestCase } from 'src/utils/tests'
 import { describe, expect, it } from 'vitest'
-import * as constraintChecker from './constraint-checker'
 
 describe(toModule(__filename), () => {
   describe('validateConstraints', () => {
